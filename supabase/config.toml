@@ -1,0 +1,4 @@
+project_id = "your-supabase-project-id"
+
+[functions.urbanmoney-proxy]
+verify_jwt = false
